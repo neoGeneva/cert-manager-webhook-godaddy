@@ -4,15 +4,31 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
+	"net/http"
+	"bytes"
+	"io"
+	"io/ioutil"
+	"time"
 
 	extapi "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	//"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/jetstack/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
 	"github.com/jetstack/cert-manager/pkg/acme/webhook/cmd"
+	certmanager_v1alpha1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha1"
+	"github.com/jetstack/cert-manager/pkg/issuer/acme/dns/util"
+	pkgutil "github.com/jetstack/cert-manager/pkg/util"
 )
 
+const (
+	defaultTTL = 600
+	defaultBaseURL = "https://api.godaddy.com"
+)
+
+// GroupName the API is in within Kubernetes, e.g. certmanager.k8s.io
 var GroupName = os.Getenv("GROUP_NAME")
 
 func main() {
@@ -35,13 +51,7 @@ func main() {
 // To do so, it must implement the `github.com/jetstack/cert-manager/pkg/acme/webhook.Solver`
 // interface.
 type customDNSProviderSolver struct {
-	// If a Kubernetes 'clientset' is needed, you must:
-	// 1. uncomment the additional `client` field in this structure below
-	// 2. uncomment the "k8s.io/client-go/kubernetes" import at the top of the file
-	// 3. uncomment the relevant code in the Initialize method below
-	// 4. ensure your webhook's service account has the required RBAC role
-	//    assigned to it for interacting with the Kubernetes APIs you need.
-	//client kubernetes.Clientset
+	client *kubernetes.Clientset
 }
 
 // customDNSProviderConfig is a structure that is used to decode into when
@@ -59,23 +69,24 @@ type customDNSProviderSolver struct {
 // be used by your provider here, you should reference a Kubernetes Secret
 // resource and fetch these credentials using a Kubernetes clientset.
 type customDNSProviderConfig struct {
-	// Change the two fields below according to the format of the configuration
-	// to be decoded.
-	// These fields will be set by users in the
-	// `issuer.spec.acme.dns01.providers.webhook.config` field.
-
-	//Email           string `json:"email"`
-	//APIKeySecretRef v1alpha1.SecretKeySelector `json:"apiKeySecretRef"`
+	AuthAPIKey        string                                 `json:"authAPIKey"`
+	APITokenSecretRef certmanager_v1alpha1.SecretKeySelector `json:"authAPISecretRef"`
+	TTL               *int                                   `json:"ttl"`
+	Transport         http.RoundTripper                      `json:"transport"`
+	apiToken          string;
 }
 
-// Name is used as the name for this DNS solver when referencing it on the ACME
-// Issuer resource.
-// This should be unique **within the group name**, i.e. you can have two
-// solvers configured with the same Name() **so long as they do not co-exist
-// within a single webhook deployment**.
-// For example, `cloudflare` may be used as the name of a solver.
+// DNSRecord a DNS record
+type DNSRecord struct {
+	Type     string `json:"type"`
+	Name     string `json:"name"`
+	Data     string `json:"data"`
+	Priority int    `json:"priority,omitempty"`
+	TTL      int    `json:"ttl,omitempty"`
+}
+
 func (c *customDNSProviderSolver) Name() string {
-	return "my-custom-solver"
+	return "godaddy"
 }
 
 // Present is responsible for actually presenting the DNS record with the
@@ -88,11 +99,35 @@ func (c *customDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 	if err != nil {
 		return err
 	}
+		
+	ref := cfg.APITokenSecretRef
 
-	// TODO: do something more useful with the decoded configuration
-	fmt.Printf("Decoded configuration %v", cfg)
+	secret, err := c.client.CoreV1().Secrets(ch.ResourceNamespace).Get(ref.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
 
-	// TODO: add code that sets a record in the DNS provider's console
+	apiToken, ok := secret.Data[ref.Key]
+	if !ok {
+		return fmt.Errorf("no api token for %q in secret '%s/%s'", ref.Name, ref.Key, ch.ResourceNamespace)
+	}
+
+	cfg.apiToken = string(apiToken);
+	
+	name := extractRecordName(ch.ResolvedFQDN, ch.ResolvedZone)
+
+	rec := &DNSRecord{
+		Type: "TXT",
+		Name: name,
+		Data: ch.Key,
+		TTL:  *cfg.TTL,
+	}
+
+	err = c.updateRecords(rec, ch.ResolvedZone, cfg)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -103,8 +138,34 @@ func (c *customDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 // This is in order to facilitate multiple DNS validations for the same domain
 // concurrently.
 func (c *customDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
-	// TODO: add code that deletes a record from the DNS provider's console
-	return nil
+	cfg, err := loadConfig(ch.Config)
+	if err != nil {
+		return err
+	}
+		
+	ref := cfg.APITokenSecretRef
+
+	secret, err := c.client.CoreV1().Secrets(ch.ResourceNamespace).Get(ref.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	apiToken, ok := secret.Data[ref.Key]
+	if !ok {
+		return fmt.Errorf("no api token for %q in secret '%s/%s'", ref.Name, ref.Key, ch.ResourceNamespace)
+	}
+
+	cfg.apiToken = string(apiToken);
+
+	name := extractRecordName(ch.ResolvedFQDN, ch.ResolvedZone)
+
+	rec := &DNSRecord{
+		Type: "TXT",
+		Name: name,
+		Data: "null",
+	}
+	
+	return c.updateRecords(rec, ch.ResolvedZone, cfg)
 }
 
 // Initialize will be called when the webhook first starts.
@@ -117,24 +178,20 @@ func (c *customDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 // The stopCh can be used to handle early termination of the webhook, in cases
 // where a SIGTERM or similar signal is sent to the webhook process.
 func (c *customDNSProviderSolver) Initialize(kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
-	///// UNCOMMENT THE BELOW CODE TO MAKE A KUBERNETES CLIENTSET AVAILABLE TO
-	///// YOUR CUSTOM DNS PROVIDER
+	cl, err := kubernetes.NewForConfig(kubeClientConfig)
+	if err != nil {
+		return err
+	}
+	c.client = cl
 
-	//cl, err := kubernetes.NewForConfig(kubeClientConfig)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//c.client = cl
-
-	///// END OF CODE TO MAKE KUBERNETES CLIENTSET AVAILABLE
 	return nil
 }
 
 // loadConfig is a small helper function that decodes JSON configuration into
 // the typed config struct.
 func loadConfig(cfgJSON *extapi.JSON) (customDNSProviderConfig, error) {
-	cfg := customDNSProviderConfig{}
+	ttl := defaultTTL
+	cfg := customDNSProviderConfig{TTL: &ttl}
 	// handle the 'base case' where no configuration has been provided
 	if cfgJSON == nil {
 		return cfg, nil
@@ -144,4 +201,52 @@ func loadConfig(cfgJSON *extapi.JSON) (customDNSProviderConfig, error) {
 	}
 
 	return cfg, nil
+}
+
+func extractRecordName(fqdn, zone string) string {
+	if idx := strings.Index(fqdn, "."+zone); idx != -1 {
+		return fqdn[:idx]
+	}
+
+	return util.UnFqdn(fqdn)
+}
+
+func (c *customDNSProviderSolver) updateRecords(r *DNSRecord, domainZone string, cfg customDNSProviderConfig) error {
+	body, err := json.Marshal([]DNSRecord{*r})
+	if err != nil {
+		return err
+	}
+
+	var resp *http.Response
+	resp, err = c.makeRequest(http.MethodPut, fmt.Sprintf("/v1/domains/%s/records/TXT/%s", domainZone, r.Name), bytes.NewReader(body), cfg)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+		return fmt.Errorf("could not create record %v; Status: %v; Body: %s", string(body), resp.StatusCode, string(bodyBytes))
+	}
+	return nil
+}
+
+func (c *customDNSProviderSolver) makeRequest(method, uri string, body io.Reader, cfg customDNSProviderConfig) (*http.Response, error) {
+	req, err := http.NewRequest(method, fmt.Sprintf("%s%s", defaultBaseURL, uri), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", pkgutil.CertManagerUserAgent)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("sso-key %s:%s", cfg.AuthAPIKey, cfg.apiToken))
+
+	client := http.Client{
+		Transport: cfg.Transport,
+		Timeout:   30 * time.Second,
+	}
+
+	return client.Do(req)
 }
