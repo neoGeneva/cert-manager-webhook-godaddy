@@ -1,0 +1,7 @@
+{
+    "authAPIKey": "authKey",
+    "authAPISecretRef": {
+        "name": "godaddy-api-key",
+        "key": "key"
+    }
+}

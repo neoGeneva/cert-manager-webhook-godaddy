@@ -14,3 +14,5 @@
 # Ignore the built binary
 cert-manager-webhook-godaddy
 _out
+testdata/my-custom-solver/api-key.yaml
+testdata/my-custom-solver/config.json
