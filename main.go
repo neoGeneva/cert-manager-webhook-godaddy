@@ -72,7 +72,6 @@ type customDNSProviderConfig struct {
 	AuthAPIKey        string                                 `json:"authAPIKey"`
 	APITokenSecretRef certmanager_v1alpha1.SecretKeySelector `json:"authAPISecretRef"`
 	TTL               *int                                   `json:"ttl"`
-	Transport         http.RoundTripper                      `json:"transport"`
 	apiToken          string;
 }
 
@@ -115,6 +114,7 @@ func (c *customDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 	cfg.apiToken = string(apiToken);
 	
 	name := extractRecordName(ch.ResolvedFQDN, ch.ResolvedZone)
+	domain := ch.ResolvedZone[:len(ch.ResolvedZone)-1]
 
 	rec := &DNSRecord{
 		Type: "TXT",
@@ -123,7 +123,7 @@ func (c *customDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 		TTL:  *cfg.TTL,
 	}
 
-	err = c.updateRecords(rec, ch.ResolvedZone, cfg)
+	err = c.updateRecords(rec, domain, cfg)
 	if err != nil {
 		return err
 	}
@@ -158,6 +158,7 @@ func (c *customDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 	cfg.apiToken = string(apiToken);
 
 	name := extractRecordName(ch.ResolvedFQDN, ch.ResolvedZone)
+	domain := ch.ResolvedZone[:len(ch.ResolvedZone)-1]
 
 	rec := &DNSRecord{
 		Type: "TXT",
@@ -165,7 +166,7 @@ func (c *customDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 		Data: "null",
 	}
 	
-	return c.updateRecords(rec, ch.ResolvedZone, cfg)
+	return c.updateRecords(rec, domain, cfg)
 }
 
 // Initialize will be called when the webhook first starts.
@@ -244,7 +245,6 @@ func (c *customDNSProviderSolver) makeRequest(method, uri string, body io.Reader
 	req.Header.Set("Authorization", fmt.Sprintf("sso-key %s:%s", cfg.AuthAPIKey, cfg.apiToken))
 
 	client := http.Client{
-		Transport: cfg.Transport,
 		Timeout:   30 * time.Second,
 	}
 

@@ -27,6 +27,8 @@
 	// "postCreateCommand": "go version",
 
 	"extensions": [
-		"ms-vscode.go"
+		"ms-vscode.go",
+		"devondcarew.bazel-code",
+		"redhat.vscode-yaml"
 	]
 }

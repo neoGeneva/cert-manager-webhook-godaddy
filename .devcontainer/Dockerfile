@@ -71,3 +71,5 @@ RUN go get -x -d github.com/stamblerre/gocode 2>&1 \
 
 # Uncomment the line below if you are using go modules
 ENV GO111MODULE=on
+
+RUN go get golang.org/x/tools/gopls@latest
