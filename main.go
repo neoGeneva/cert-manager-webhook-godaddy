@@ -1,20 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
-	"strings"
-	"net/http"
-	"bytes"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	extapi "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/jetstack/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
 	"github.com/jetstack/cert-manager/pkg/acme/webhook/cmd"
@@ -24,11 +24,11 @@ import (
 )
 
 const (
-	defaultTTL = 600
+	defaultTTL     = 600
 	defaultBaseURL = "https://api.godaddy.com"
 )
 
-// GroupName the API is in within Kubernetes, e.g. certmanager.k8s.io
+// GroupName the API is in within Kubernetes, e.g. cert-manager.io/v1alpha2
 var GroupName = os.Getenv("GROUP_NAME")
 
 func main() {
@@ -72,7 +72,7 @@ type customDNSProviderConfig struct {
 	AuthAPIKey        string                                 `json:"authAPIKey"`
 	APITokenSecretRef certmanager_v1alpha1.SecretKeySelector `json:"authAPISecretRef"`
 	TTL               *int                                   `json:"ttl"`
-	apiToken          string;
+	apiToken          string
 }
 
 // DNSRecord a DNS record
@@ -98,7 +98,7 @@ func (c *customDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 	if err != nil {
 		return err
 	}
-		
+
 	ref := cfg.APITokenSecretRef
 
 	secret, err := c.client.CoreV1().Secrets(ch.ResourceNamespace).Get(ref.Name, metav1.GetOptions{})
@@ -111,8 +111,8 @@ func (c *customDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 		return fmt.Errorf("no api token for %q in secret '%s/%s'", ref.Name, ref.Key, ch.ResourceNamespace)
 	}
 
-	cfg.apiToken = string(apiToken);
-	
+	cfg.apiToken = string(apiToken)
+
 	name := extractRecordName(ch.ResolvedFQDN, ch.ResolvedZone)
 	domain := ch.ResolvedZone[:len(ch.ResolvedZone)-1]
 
@@ -142,7 +142,7 @@ func (c *customDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 	if err != nil {
 		return err
 	}
-		
+
 	ref := cfg.APITokenSecretRef
 
 	secret, err := c.client.CoreV1().Secrets(ch.ResourceNamespace).Get(ref.Name, metav1.GetOptions{})
@@ -155,7 +155,7 @@ func (c *customDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 		return fmt.Errorf("no api token for %q in secret '%s/%s'", ref.Name, ref.Key, ch.ResourceNamespace)
 	}
 
-	cfg.apiToken = string(apiToken);
+	cfg.apiToken = string(apiToken)
 
 	name := extractRecordName(ch.ResolvedFQDN, ch.ResolvedZone)
 	domain := ch.ResolvedZone[:len(ch.ResolvedZone)-1]
@@ -165,7 +165,7 @@ func (c *customDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 		Name: name,
 		Data: "null",
 	}
-	
+
 	return c.updateRecords(rec, domain, cfg)
 }
 
@@ -245,7 +245,7 @@ func (c *customDNSProviderSolver) makeRequest(method, uri string, body io.Reader
 	req.Header.Set("Authorization", fmt.Sprintf("sso-key %s:%s", cfg.AuthAPIKey, cfg.apiToken))
 
 	client := http.Client{
-		Timeout:   30 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 
 	return client.Do(req)
