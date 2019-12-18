@@ -5,7 +5,7 @@ certManager:
   serviceAccountName: cert-manager
 
 image:
-  repository: r.cfcr.io/neogeneva/neogeneva/cert-manager-webhook-godaddy
+  repository: quay.io/neogeneva/cert-manager-webhook-godaddy
   tag: 0.0.1
   pullPolicy: IfNotPresent
 

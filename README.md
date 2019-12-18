@@ -2,7 +2,7 @@
 
 This is a webhook solver for [GoDaddy](https://godaddy.com).
 
-[![Codefresh build status]( https://g.codefresh.io/api/badges/pipeline/neogeneva/default%2Fcert-manager-webhook-godaddy?key=eyJhbGciOiJIUzI1NiJ9.NWRmNWY5YjNiNjc5MzBjZTA0NTNkZTM4.rWK7H17qlAuyQMU7KP2HblmARjdu74maapjXEbvY-zc&type=cf-1)]( https://g.codefresh.io/pipelines/cert-manager-webhook-godaddy/builds?filter=trigger:build~Build;pipeline:5df5fa486baea507b9de7439~cert-manager-webhook-godaddy)
+[![Docker Repository on Quay](https://quay.io/repository/neogeneva/cert-manager-webhook-godaddy/status "Docker Repository on Quay")](https://quay.io/repository/neogeneva/cert-manager-webhook-godaddy)
 
 ## Requirements
 
@@ -12,9 +12,9 @@ This is a webhook solver for [GoDaddy](https://godaddy.com).
 ## Installing
 
 ```bash
-helm repo add neogeneva https://h.cfcr.io/neogeneva/default
+helm repo add godaddy-webhook https://https://raw.githubusercontent.com/neoGeneva/cert-manager-webhook-godaddy/master/deploy/repo
 helm repo update
-helm install --namespace cert-manager cert-manager-webhook-godaddy neogeneva/cert-manager-webhook-godaddy
+helm install --namespace cert-manager cert-manager-webhook-godaddy godaddy-webhook/cert-manager-webhook-godaddy
 ```
 
 ## Configuration
