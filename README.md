@@ -12,7 +12,7 @@ This is a webhook solver for [GoDaddy](https://godaddy.com).
 ## Installing
 
 ```bash
-helm repo add godaddy-webhook https://https://raw.githubusercontent.com/neoGeneva/cert-manager-webhook-godaddy/master/deploy/repo
+helm repo add godaddy-webhook https://raw.githubusercontent.com/neoGeneva/cert-manager-webhook-godaddy/master/deploy/repo
 helm repo update
 helm install --namespace cert-manager cert-manager-webhook-godaddy godaddy-webhook/cert-manager-webhook-godaddy
 ```
