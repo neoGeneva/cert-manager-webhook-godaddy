@@ -1,5 +1,5 @@
-apiVersion: apps/v1beta2
-kind: Deployment  
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: {{ include "godaddy-webhook.fullname" . }}
   labels:
