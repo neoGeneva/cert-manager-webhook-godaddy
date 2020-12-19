@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/jetstack/cert-manager/test/acme/dns"
-	
+
 	"k8s.io/client-go/rest"
 )
 
@@ -29,14 +29,14 @@ func (c *testCustomDNSProviderSolver) Initialize(kubeClientConfig *rest.Config, 
 	}
 
 	cmd := exec.Command(
-		fmt.Sprintf("%s/kubectl", kubeBuilderBinPath), 
-		"apply", 
-		"-f", 
-		fmt.Sprintf("%s/api-key.yaml", testPath), 
-		"-s", 
+		fmt.Sprintf("%s/kubectl", kubeBuilderBinPath),
+		"apply",
+		"-f",
+		fmt.Sprintf("%s/api-key.yaml", testPath),
+		"-s",
 		kubeClientConfig.Host,
 	)
-	
+
 	_, err = cmd.Output()
 
 	return err
@@ -55,5 +55,5 @@ func TestRunsSuite(t *testing.T) {
 	)
 
 	fixture.RunConformance(t)
-	
+
 }

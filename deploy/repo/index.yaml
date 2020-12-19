@@ -3,11 +3,20 @@ entries:
   cert-manager-webhook-godaddy:
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2019-12-18T21:21:46.189128+13:00"
+    created: "2020-12-19T08:03:10.735469-06:00"
+    description: A GoDaddy webhook for cert-manager
+    digest: f033ee4d3abedc2017fc22d755a16b07052597fec27eab39fb97f31a43660f03
+    name: cert-manager-webhook-godaddy
+    urls:
+    - cert-manager-webhook-godaddy-0.1.6.tgz
+    version: 0.1.6
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2020-12-19T08:03:10.735029-06:00"
     description: A GoDaddy webhook for cert-manager
     digest: 476535bbe4871f343fca48efb2b492b0f795a502e1a72354bccdd81d9b4aaf43
     name: cert-manager-webhook-godaddy
     urls:
     - cert-manager-webhook-godaddy-0.1.5.tgz
     version: 0.1.5
-generated: "2019-12-18T21:21:46.1881291+13:00"
+generated: "2020-12-19T08:03:10.733657-06:00"
