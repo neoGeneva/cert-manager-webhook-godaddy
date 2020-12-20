@@ -39,7 +39,7 @@ spec:
         webhook:
           groupName: acme.blackhouse.dev
           solverName: godaddy
-          config:    
+          config:
             authAPIKey: <GODADDY_AUTH_TOKEN>
             authAPISecretRef:
               name: godaddy-api-key
